@@ -1,0 +1,95 @@
+#
+# Build and publish image.
+#
+on:
+  workflow_call:
+    inputs:
+      ARTIFACT_NAME:
+        description: "Name of the artifact to include in Docker image."
+        type: string
+        required: true
+      PROFILE:
+        description: "Profile used to build."
+        type: string
+        required: true
+
+env:
+  DOCKER_FILE: "./Dockerfile"
+  DOCKER_BUILD_DIR: "docker"
+  DOCKER_IMAGE: "kodiak-web-server"
+  REGISTRY: "ghcr.io"
+  ARTIFACT_RETENTION: 90
+
+# Restrict permissions of GITHUB_TOKEN
+# Access to scopes not specified is set to "none"
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v4
+
+      # Get the SHA of the checked out ref.
+      - name: set SHA_SHORT
+        run: |
+          echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: Download artifact ${{ inputs.ARTIFACT_NAME }}
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.ARTIFACT_NAME }}
+          path: ${{ env.DOCKER_BUILD_DIR }}/
+
+      - name: docker-build
+        run: |
+          cd ${{ env.DOCKER_BUILD_DIR }}
+          docker image build \
+          --tag ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ inputs.PROFILE }}.${{ env.SHA_SHORT }} \
+          --file ${{ env.DOCKER_FILE }} \
+          --no-cache \
+          .
+      - name: docker-save
+        run: |
+          docker save ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ inputs.PROFILE }}.${{ env.SHA_SHORT }} \
+          --output ${{ env.DOCKER_IMAGE }}.${{ inputs.PROFILE }}.${{ env.SHA_SHORT }}.tar
+
+      - name: Upload artifact - target ${{ inputs.PROFILE }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.DOCKER_IMAGE }}.${{ inputs.PROFILE }}.image
+          path: ${{ env.DOCKER_IMAGE }}.${{ inputs.PROFILE }}.${{ env.SHA_SHORT }}.tar
+          if-no-files-found: error
+          retention-days: ${{ env.ARTIFACT_RETENTION }}
+
+      - name: docker-login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.PAT_PUBLISH_TO_GHCR }}
+
+      - name: docker-tag (dev)
+        if: ${{ inputs.PROFILE == 'dev' }}
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ inputs.PROFILE }}.${{ env.SHA_SHORT }} \
+                     ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:dev.latest
+
+      - name: docker-tag (release)
+        if: ${{ inputs.PROFILE == 'release' }}
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ inputs.PROFILE }}.${{ env.SHA_SHORT }} \
+                     ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:release.latest
+          docker tag ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ inputs.PROFILE }}.${{ env.SHA_SHORT }} \
+                     ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:latest
+
+      - name: docker-push
+        run: |
+          docker push --all-tags ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}
