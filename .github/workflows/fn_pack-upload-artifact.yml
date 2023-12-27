@@ -1,0 +1,102 @@
+#
+# Pack and upload artifact.
+#
+on:
+  workflow_call:
+    inputs:
+      BUILD_CACHE_KEY:
+        description: "Cache key for the build."
+        required: true
+        type: string
+      ARTIFACT_RETENTION:
+        description: "Artifacts' retention."
+        default: '90'
+        required: false
+        type: string
+      PROFILE:
+        description: "Profile used for packaging."
+        default: "dev"
+        required: false
+        type: string
+
+    outputs:
+      ARTIFACT_NAME:
+        description: "Name of the artifact uploaded."
+        value: ${{ jobs.package.outputs.ARTIFACT_NAME }}
+
+env:
+  BINARY: 'kodiak-web-server'
+  CLIENT_REPO: 'polarlabs/kodiak-web-client'
+
+# Restrict permissions of GITHUB_TOKEN
+# Access to scopes not specified is set to "none"
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    # Map step outputs to job outputs.
+    outputs:
+      ARTIFACT_NAME: ${{ steps.set-output.outputs.ARTIFACT_NAME }}
+
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v4
+
+      - name: Restore build cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            target/
+          key: ${{ inputs.BUILD_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Set environment (stage 1)
+        if: inputs.PROFILE == 'dev'
+        run: |
+          echo "TARGET=debug" >> $GITHUB_ENV
+
+      - name: Set environment (stage 2)
+        if: inputs.PROFILE != 'dev'
+        run: |
+          echo "TARGET=${{ inputs.PROFILE }}" >> $GITHUB_ENV
+
+      - name: Set environment (stage 3)
+        run: |
+          echo "ARTIFACT_NAME=${{ env.BINARY }}.${{ env.TARGET }}" >> $GITHUB_ENV
+
+      # If release download fails with "release not found", it could be an authentication issue.
+      - name: Download release - ${{ env.CLIENT_REPO }} - latest
+        run: |
+          gh release download ${{ inputs.PROFILE }}/latest --repo ${{ env.CLIENT_REPO }} --pattern dist.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_GET_RELEASE_ASSET_KODIAK_WEB_CLIENT }}
+
+      - name: Prepare artifact - target ${{ env.TARGET }}
+        run: |
+          mkdir -p app
+          cp -a client app/
+          ls -al
+          tar -xzf dist.tar.gz --directory app/client/ --strip-components=1
+          cp -a ./target/${{ env.TARGET }}/${{ env.BINARY }} app/ 
+          tar -czf app.tar.gz app
+
+      - name: Upload artifact - target ${{ env.TARGET }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: app.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ env.ARTIFACT_RETENTION }}
+
+      - name: Set output
+        id: set-output
+        run: |
+          echo "::notice title=ARTIFACT_NAME::✅ ARTIFACT_NAME: ${{ env.ARTIFACT_NAME }} ."
+          echo "ARTIFACT_NAME=${{ env.ARTIFACT_NAME }}" >> $GITHUB_OUTPUT

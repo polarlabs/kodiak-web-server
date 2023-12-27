@@ -23,6 +23,6 @@ tbd
 - Use database migration scripts to create and maintain database schema.
 - Implement a logging facility.
 
-## Version 0.1.0 (in progress)
+## Version 0.1.0 (delivered)
 
 - Initial release.

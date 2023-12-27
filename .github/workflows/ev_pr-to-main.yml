@@ -1,0 +1,37 @@
+name: pr-to-main
+run-name: "${{ github.workflow }}: ${{ github.base_ref }} / ${{ github.run_number }}.${{ github.run_attempt }}"
+
+on:
+  pull_request:
+    # Using branches and paths filters, requires both filters to be satisfied.
+    branches:
+      - 'main'
+    paths:
+      - 'client/**'
+      - 'docker/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '.github/workflows/ev_pr-to-main.yml'
+      - '.github/workflows/wf_full.yml'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  cargo-fetch:
+    uses: polarlabs/factory/.github/workflows/cargo-dep-cache.yml@v/4.0.0
+
+  wf_build-test:
+    uses: polarlabs/kodiak-web-server/.github/workflows/wf_build-test.yml@main
+    needs: [ cargo-fetch ]
+    strategy:
+      matrix:
+        profiles: [ dev ]
+      fail-fast: false
+    with:
+      DEPS_CACHE_KEY: ${{ needs.cargo-fetch.outputs.CACHE_KEY }}
+      PROFILE: ${{ matrix.profiles }}
+    secrets: inherit
