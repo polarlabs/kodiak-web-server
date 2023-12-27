@@ -1,0 +1,48 @@
+#
+# Build and test
+#
+on:
+  workflow_call:
+    inputs:
+      DEPS_CACHE_KEY:
+        description: "Cache key for the dependencies."
+        type: string
+        required: true
+      PROFILE:
+        description: "Profile used to build."
+        default: "dev"
+        required: false
+        type: string
+
+#env:
+
+# Restrict permissions of GITHUB_TOKEN
+# Access to scopes not specified is set to "none"
+#permissions:
+#  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  cargo-build:
+    uses: polarlabs/factory/.github/workflows/cargo-build-cache.yml@v/4.0.0
+    with:
+      DEPS_CACHE_KEY: ${{ inputs.DEPS_CACHE_KEY }}
+      PROFILE: ${{ inputs.PROFILE }}
+
+  cargo-test:
+    uses: polarlabs/factory/.github/workflows/cargo-test.yml@v/4.0.0
+    needs: [ cargo-build ]
+    with:
+      DEPS_CACHE_KEY: ${{ inputs.DEPS_CACHE_KEY }}
+      BUILD_CACHE_KEY: ${{ needs.cargo-build.outputs.CACHE_KEY }}
+      PROFILE: ${{ inputs.PROFILE }}
+
+  upload-artifact:
+    uses: polarlabs/kodiak-web-server/.github/workflows/fn_pack-upload-artifact.yml@main
+    needs: [ cargo-build, cargo-test ]
+    with:
+      BUILD_CACHE_KEY: ${{ needs.cargo-build.outputs.CACHE_KEY }}
+      PROFILE: ${{ inputs.PROFILE }}

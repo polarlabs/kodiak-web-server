@@ -1,0 +1,37 @@
+name: push-to-feat
+run-name: "${{ github.workflow }}: ${{ github.ref_name }} / ${{ github.run_number }}.${{ github.run_attempt }}"
+
+on:
+  push:
+    # Using branches and paths filters, requires both filters to be satisfied.
+    branches:
+      - 'feat/**'
+    paths:
+      - 'client/**'
+      - 'docker/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '.github/workflows/ev_push-to-feat.yml'
+      - '.github/workflows/wf_build-test.yml'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  cargo-fetch:
+    uses: polarlabs/factory/.github/workflows/cargo-dep-cache.yml@v/4.0.0
+
+  wf_build-test:
+    uses: polarlabs/kodiak-web-server/.github/workflows/wf_build-test.yml@dev
+    needs: [ cargo-fetch ]
+    strategy:
+      matrix:
+        profiles: [ dev ]
+      fail-fast: false
+    with:
+      DEPS_CACHE_KEY: ${{ needs.cargo-fetch.outputs.CACHE_KEY }}
+      PROFILE: ${{ matrix.profiles }}
+    secrets: inherit

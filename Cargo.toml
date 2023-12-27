@@ -1,0 +1,52 @@
+[package]
+name = "kodiak-web-server"
+version = "0.1.0"
+authors = ["Tobias Mucke <tobias.mucke@gmail.com>"]
+description = "Kodiak's web server."
+documentation = "https://polarlabs.io/docs"
+readme = "README.md"
+homepage = "https://www.polarlabs.io/"
+repository = "https://github.com/polarlabs/kodiak-web-server/"
+license = "AGPL-3.0-only"
+edition = "2021"
+
+# Despite being Open Source and published on GitHub,
+# it is not intented to publish it via a registry like crates.io.
+publish = false
+
+# Disable autodiscovery for tests, use test target (see below).
+autotests = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "kodiak-web-server"
+
+[dependencies]
+actix-files = "0.6.2"
+actix-web = "4.3.1"
+tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+reqwest = "0.11.18"
+
+# Dedicated target for tests to avoid having one crate per test file,
+# allows code sharing across multiple test files.
+# How to run tests:
+# - all tests: `cargo test`
+# - unit tests (lib) only: `cargo test --lib`
+# - unit tests (bins) only: `cargo test --bin '*'`
+# - integration tests only: `cargo test --test integration`
+# - doc tests only: `cargo test --doc`
+[[test]]
+name = "integration"
+path = "tests/lib.rs"
+
+# See: https://github.com/johnthagen/min-sized-rust
+#[profile.release]
+#codegen-units = 1
+#lto = true
+#panic = "abort"
+#strip = true
