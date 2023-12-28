@@ -17,5 +17,6 @@ RUN tar -xzf ${APP_SOURCE_ARCHIVE}
 WORKDIR ${APP_WORKDIR}
 
 EXPOSE 8080
+EXPOSE 8443
 
 CMD ["./kodiak-web-server"]
