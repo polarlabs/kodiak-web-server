@@ -22,6 +22,7 @@ tbd
 - Update connected clients via WebSocket.
 - Use database migration scripts to create and maintain database schema.
 - Implement a logging facility.
+- Run Kodiak's web server as non-root within Docker container.
 
 ## Version 0.1.0 (delivered)
 
