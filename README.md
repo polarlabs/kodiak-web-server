@@ -7,23 +7,32 @@ as a Docker image including the [Kodiak web client](https://github.com/polarlabs
 
 ## Version 0.4.0 (planned)
 
-tbd
+:pencil: tbd
 
 ## Version 0.3.0 (planned)
 
-- Support user authentication.
+:pencil: Support user authentication.
 
 ## Version 0.2.0 (in progress)
 
-- Enforce HTTPS, i.e. redirecting any traffic on port 80 to 443.
-- Automate HTTPS certificate management via Let's encrypt. 
-- Deploy to kodiak.polarlabs.dev.
-- Provide CRUD operations for `Namespaces` via REST API.
-- Update connected clients via WebSocket.
-- Use database migration scripts to create and maintain database schema.
-- Implement a logging facility.
-- Run Kodiak's web server as non-root within Docker container.
+:pencil: Support HTTPS.
+
+:heavy_check_mark: Enforce HTTPS, i.e. redirect any traffic on port HTTP (8080) to HTTPS (8443).
+
+:pencil: Automate HTTPS certificate management via Let's encrypt.
+
+:pencil: Deploy to kodiak.polarlabs.dev.
+
+:pencil: Provide CRUD operations for `Namespaces` via REST API.
+
+:pencil: Update connected clients via WebSocket.
+ 
+:pencil: Use database migration scripts to create and maintain database schema.
+
+:pencil: Implement a logging facility.
+
+:pencil: Run Kodiak's web server as non-root within Docker container.
 
 ## Version 0.1.0 (delivered)
 
-- Initial release.
+:heavy_check_mark: Initial release.
