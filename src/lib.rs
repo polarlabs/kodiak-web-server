@@ -3,8 +3,12 @@ use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 use actix_web::{http, web, Responder};
 use actix_web::dev::{Server, Service};
 use futures_util::{future, FutureExt};
+use rustls;
+use rustls_pemfile::{certs, pkcs8_private_keys};
 
+use std::{fs::File, io::BufReader};
 use std::net::TcpListener;
+use rustls::ServerConfig;
 
 const CLIENT_PATH: &str = "/";
 const CLIENT_DIR: &str = "./client";
@@ -48,7 +52,7 @@ pub fn run_http(listener: TcpListener) -> Result<Server, std::io::Error> {
             } else {
                 let host = req.connection_info().host().split(":").nth(0).unwrap().to_owned();
                 let uri = req.uri().to_owned();
-                let url = format!("http://{host}:{HTTPS_PORT}{uri}");
+                let url = format!("https://{host}:{HTTPS_PORT}{uri}");
 
                 future::Either::Right(future::ready(Ok(req.into_response(
                     HttpResponse::MovedPermanently()
@@ -65,12 +69,50 @@ pub fn run_http(listener: TcpListener) -> Result<Server, std::io::Error> {
 }
 
 pub fn run_https(listener: TcpListener) -> Result<Server, std::io::Error> {
+    let tls_config = load_rustls_config();
+
     let server = HttpServer::new(|| App::new()
         .route("/status", web::get().to(status))
         .route("/version", web::get().to(version))
         .service(Files::new(CLIENT_PATH, CLIENT_DIR).index_file(INDEX_FILE)))
-        .listen(listener)?
+        .listen_rustls_0_21(listener, tls_config)?
         .run();
 
     Ok(server)
+}
+
+fn load_rustls_config() -> ServerConfig {
+    // init server config builder with safe defaults
+    let config = ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth();
+
+    // load TLS key/cert files
+    let cert_file = &mut BufReader::new(File::open("cert.pem").unwrap());
+    let key_file = &mut BufReader::new(File::open("key.pem").unwrap());
+
+    // convert files to key/cert objects
+    let cert_chain = certs(cert_file)
+        .unwrap()
+        .into_iter()
+        .map(rustls::Certificate)
+        .collect();
+    let mut keys: Vec<rustls::PrivateKey> = pkcs8_private_keys(key_file)
+        .unwrap()
+        .into_iter()
+        .map(rustls::PrivateKey)
+        .collect();
+
+    // convert files to key/cert objects (rustls 0.22.x + rustls-pemfile 2.0.0)
+    //let cert_chain: Vec<CertificateDer> = certs(cert_file).map(|x| x.unwrap()).collect();
+    //let mut keys: Vec<PrivatePkcs8KeyDer> = pkcs8_private_keys(key_file).map(|x| x.unwrap()).collect();
+
+    // exit if no keys could be parsed
+    if keys.is_empty() {
+        eprintln!("Could not locate PKCS 8 private keys.");
+        std::process::exit(1);
+    }
+
+    config.with_single_cert(cert_chain, keys.remove(0)).unwrap()
+    //config.with_single_cert(cert_chain, PrivateKeyDer::from(keys.remove(0))).unwrap()
 }

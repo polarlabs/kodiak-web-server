@@ -4,7 +4,8 @@ use crate::_setup::spawn_app_https;
 async fn get_status() {
     let address = spawn_app_https();
 
-    let client = reqwest::Client::new();
+    //let client = reqwest::Client::new();
+    let client = reqwest::Client::builder().danger_accept_invalid_certs(true).build().unwrap();
 
     let response = client
         .get(format!("{address}/status"))

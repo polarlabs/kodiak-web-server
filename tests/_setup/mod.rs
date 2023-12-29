@@ -17,5 +17,5 @@ pub fn spawn_app_https() -> String {
     let server = kodiak_web_server::run_https(listener).expect("Failed to start server.");
     let _ = tokio::spawn(server);
 
-    format!("http://localhost:{port}")
+    format!("https://localhost:{port}")
 }
