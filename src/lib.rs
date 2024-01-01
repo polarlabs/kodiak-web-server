@@ -20,7 +20,7 @@ const DEFAULT_BUILD_NUMBER: &str = "0";
 
 const CHALLENGE_DIR: &str = "./acme-challenges";
 const CERTIFICATE_DIR: &str = "./certs";
-const _DOMAIN_NAME: &str = "kodiak.polarlabs.io";
+const DOMAIN_NAME: &str = "kodiak.polarlabs.io";
 const _CONTACT_EMAIL: &str = "contact@polarlabs.io";
 
 async fn status(_req: HttpRequest) -> impl Responder {
@@ -93,8 +93,10 @@ fn load_rustls_config() -> rustls::ServerConfig {
         .with_no_client_auth();
 
     // load TLS key/cert files
-    let cert_file = &mut BufReader::new(File::open("cert.pem").unwrap());
-    let key_file = &mut BufReader::new(File::open("key.pem").unwrap());
+    //let cert_file = &mut BufReader::new(File::open("cert.pem").unwrap());
+    //let key_file = &mut BufReader::new(File::open("key.pem").unwrap());
+    let cert_file = &mut BufReader::new(File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).unwrap());
+    let key_file = &mut BufReader::new(File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key")).unwrap());
 
     // convert files to key/cert objects
     let cert_chain = certs(cert_file)
