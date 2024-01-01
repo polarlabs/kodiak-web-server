@@ -147,7 +147,7 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
         .run();
 
     let server_handle = server.handle();
-    let server_task = actix_web::rt::spawn(server);
+    let server_task = tokio::spawn(server);
 
     // Use DirectoryUrl::LetsEncryptStaging for dev/testing.
     //let url = acme::DirectoryUrl::LetsEncrypt;
