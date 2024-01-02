@@ -1,12 +1,13 @@
+mod tls;
+
+use std::fs::File;
 use actix_files::Files;
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 use actix_web::{http, web, Responder};
 use actix_web::dev::{Server, Service};
 use actix_web::middleware::{Logger};
 use futures_util::{future, FutureExt};
-use rustls_pemfile::{certs, pkcs8_private_keys};
 
-use std::{fs::File, io::BufReader};
 use std::net::TcpListener;
 use std::time::Duration;
 
@@ -21,7 +22,7 @@ const DEFAULT_BUILD_NUMBER: &str = "0";
 const CHALLENGE_DIR: &str = "./acme-challenges";
 const CERTIFICATE_DIR: &str = "./certs";
 const DOMAIN_NAME: &str = "kodiak.polarlabs.io";
-const _CONTACT_EMAIL: &str = "contact@polarlabs.io";
+const CONTACT_EMAIL: &str = "contact@polarlabs.io";
 
 async fn status(_req: HttpRequest) -> impl Responder {
     HttpResponse::Ok()
@@ -55,9 +56,15 @@ pub fn run_http(listener: TcpListener) -> Result<Server, std::io::Error> {
             if req.connection_info().scheme() == "https" {
                 future::Either::Left(srv.call(req).map(|res| res))
             } else {
-                let host = req.connection_info().host().split(':').next().unwrap().to_owned();
+                let host = req.connection_info().host().split(':').nth(0).unwrap().to_owned();
+                let port = req.connection_info().host().split(':').nth(1).unwrap().to_owned();
                 let uri = req.uri().to_owned();
-                let url = format!("https://{host}:{HTTPS_PORT}{uri}");
+
+                let url = if port == "80" {
+                    format!("https://{host}{uri}")
+                } else {
+                    format!("https://{host}:{HTTPS_PORT}{uri}")
+                };
 
                 future::Either::Right(future::ready(Ok(req.into_response(
                     HttpResponse::MovedPermanently()
@@ -86,42 +93,68 @@ pub fn run_https(listener: TcpListener) -> Result<Server, std::io::Error> {
     Ok(server)
 }
 
+pub async fn init(listener: TcpListener) {
+    if File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).is_err() {
+        match gen_tls_cert(listener, DOMAIN_NAME, CONTACT_EMAIL).await {
+            Ok(cert) => {
+                println!("Success: got a cert ({:#?})", cert);
+            },
+            Err(e) => {
+                println!("Error: {}", e);
+            }
+        }
+    } else {
+        let cert_age = tls::age(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).unwrap();
+        let cert_max_age = tls::max_age(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).unwrap();
+
+        if cert_age >= cert_max_age / 2 {
+            // Renew certificate
+            match gen_tls_cert(listener, DOMAIN_NAME, CONTACT_EMAIL).await {
+                Ok(cert) => {
+                    println!("Success: got a cert ({:#?})", cert);
+                },
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            }
+        } else {
+            // Just use certificate / key
+        }
+    }
+}
+
 fn load_rustls_config() -> rustls::ServerConfig {
-    // init server config builder with safe defaults
-    let config = rustls::ServerConfig::builder()
-        .with_safe_defaults()
-        .with_no_client_auth();
+    // Load TLS key / certificates
+    let cert_chain = tls::load_certs(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem"));
+    let key = tls::load_key(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key"));
 
-    // load TLS key/cert files
-    //let cert_file = &mut BufReader::new(File::open("cert.pem").unwrap());
-    //let key_file = &mut BufReader::new(File::open("key.pem").unwrap());
-    let cert_file = &mut BufReader::new(File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).unwrap());
-    let key_file = &mut BufReader::new(File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key")).unwrap());
+    match (cert_chain, key) {
+        (Ok(cert_chain), Ok(Some(key))) => {
+            // init server config builder with safe defaults
+            let config = rustls::ServerConfig::builder()
+                .with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(cert_chain, key);
 
-    // convert files to key/cert objects
-    let cert_chain = certs(cert_file)
-        .unwrap()
-        .into_iter()
-        .map(rustls::Certificate)
-        .collect();
-    let mut keys: Vec<rustls::PrivateKey> = pkcs8_private_keys(key_file)
-        .unwrap()
-        .into_iter()
-        .map(rustls::PrivateKey)
-        .collect();
+            config.unwrap()
+        }
+        (_, Ok(None)) => {
+            eprintln!("Could not locate PKCS 8 private keys.");
+            std::process::exit(1);
+        }
+        (Err(cert_error), _) => {
+            eprintln!("Error: {}", cert_error);
+            std::process::exit(1);
+        }
+        (_, Err(key_error)) => {
+            eprintln!("Error: {}", key_error);
+            std::process::exit(1);
+        }
+    }
 
     // convert files to key/cert objects (rustls 0.22.x + rustls-pemfile 2.0.0)
     //let cert_chain: Vec<CertificateDer> = certs(cert_file).map(|x| x.unwrap()).collect();
     //let mut keys: Vec<PrivatePkcs8KeyDer> = pkcs8_private_keys(key_file).map(|x| x.unwrap()).collect();
-
-    // exit if no keys could be parsed
-    if keys.is_empty() {
-        eprintln!("Could not locate PKCS 8 private keys.");
-        std::process::exit(1);
-    }
-
-    config.with_single_cert(cert_chain, keys.remove(0)).unwrap()
-    //config.with_single_cert(cert_chain, PrivateKeyDer::from(keys.remove(0))).unwrap()
 }
 
 pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_email: &str) -> eyre::Result<acme::Certificate> {
@@ -260,8 +293,4 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
     log::info!("Private key persisted to {key_path}.");
 
     Ok(cert)
-}
-
-pub fn cert_remaining_validity() -> u32 {
-    42
 }

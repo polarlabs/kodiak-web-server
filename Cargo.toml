@@ -32,6 +32,7 @@ eyre = "0.6.11"
 color-eyre = "0.6.2"
 futures-util = "0.3.30"
 log = "0.4.20"
+openssl = "0.10.62"
 rustls = "0.21.10"
 rustls-pemfile = "1.0.4"
 

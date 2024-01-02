@@ -15,11 +15,11 @@ as a Docker image including the [Kodiak web client](https://github.com/polarlabs
 
 ## Version 0.2.0 (in progress)
 
-:pencil: Support HTTPS.
+:heavy_check_mark: Support HTTPS.
 
 :heavy_check_mark: Enforce HTTPS, i.e. redirect any traffic on port HTTP (8080) to HTTPS (8443).
 
-:pencil: Automate HTTPS certificate management via Let's encrypt.
+:heavy_check_mark: Automate HTTPS certificate management via Let's encrypt.
 
 :pencil: Deploy to kodiak.polarlabs.dev.
 
