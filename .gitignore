@@ -1,4 +1,9 @@
 /**/target
 /**/.env
 
+/**/*.pem
+/**/*.key
+/acme-challenges
+/certs
+
 .idea

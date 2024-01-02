@@ -14,7 +14,8 @@ on:
       - 'Cargo.lock'
       - 'Cargo.toml'
       - '.github/workflows/ev_pr-to-dev.yml'
-      - '.github/workflows/wf_full.yml'
+      - '.github/workflows/wf_build-test.yml'
+      - '.github/workflows/fn_pack-upload-artifact.yml'
 
 defaults:
   run:
