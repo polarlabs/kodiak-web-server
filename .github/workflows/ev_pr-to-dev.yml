@@ -14,7 +14,8 @@ on:
       - 'Cargo.lock'
       - 'Cargo.toml'
       - '.github/workflows/ev_pr-to-dev.yml'
-      - '.github/workflows/wf_full.yml'
+      - '.github/workflows/wf_build-test.yml'
+      - '.github/workflows/fn_pack-upload-artifact.yml'
 
 defaults:
   run:
@@ -24,8 +25,9 @@ jobs:
   cargo-fetch:
     uses: polarlabs/factory/.github/workflows/cargo-dep-cache.yml@v/4.0.0
 
+  # todo: feat/https -> dev
   wf_build-test:
-    uses: polarlabs/kodiak-web-server/.github/workflows/wf_build-test.yml@dev
+    uses: polarlabs/kodiak-web-server/.github/workflows/wf_build-test.yml@feat/https
     needs: [ cargo-fetch ]
     strategy:
       matrix:
