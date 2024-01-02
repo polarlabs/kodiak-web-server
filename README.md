@@ -15,7 +15,7 @@ as a Docker image including the [Kodiak web client](https://github.com/polarlabs
 
 ## Version 0.2.0 (in progress)
 
-:heavy_check_mark: Support HTTPS.
+:heavy_check_mark: Support HTTPS: achieve an overall rating of 'A' at [ssllabs.com](https://www.ssllabs.com/ssltest/index.html).
 
 :heavy_check_mark: Enforce HTTPS, i.e. redirect any traffic on port HTTP (8080) to HTTPS (8443).
 
