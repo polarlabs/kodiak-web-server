@@ -32,9 +32,8 @@ jobs:
       DEPS_CACHE_KEY: ${{ inputs.DEPS_CACHE_KEY }}
       PROFILE: ${{ inputs.PROFILE }}
 
-  # todo: dev -> v/4.1.0
   cargo-test:
-    uses: polarlabs/factory/.github/workflows/cargo-test.yml@dev
+    uses: polarlabs/factory/.github/workflows/cargo-test.yml@v/4.1.0
     needs: [ cargo-build ]
     with:
       DEPS_CACHE_KEY: ${{ inputs.DEPS_CACHE_KEY }}
