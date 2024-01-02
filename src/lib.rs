@@ -127,8 +127,16 @@ pub async fn init(listener: TcpListener) {
 
 fn load_rustls_config() -> rustls::ServerConfig {
     // Load TLS key / certificates
-    let cert_chain = tls::load_certs(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem"));
-    let key = tls::load_key(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key"));
+    let (cert_chain, key ) = if File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).is_ok() &&
+        File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key")).is_ok() {
+        (tls::load_certs(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")),
+         tls::load_key(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key"))
+        )
+    } else {
+        (tls::load_certs(format!("{CERTIFICATE_DIR}/localhost.pem")),
+         tls::load_key(format!("{CERTIFICATE_DIR}/localhost.key"))
+        )
+    };
 
     match (cert_chain, key) {
         (Ok(cert_chain), Ok(Some(key))) => {
