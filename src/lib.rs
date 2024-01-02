@@ -56,11 +56,13 @@ pub fn run_http(listener: TcpListener) -> Result<Server, std::io::Error> {
             if req.connection_info().scheme() == "https" {
                 future::Either::Left(srv.call(req).map(|res| res))
             } else {
-                let host = req.connection_info().host().split(':').nth(0).unwrap().to_owned();
-                let port = req.connection_info().host().split(':').nth(1).unwrap().to_owned();
+                let conn_info = req.connection_info().clone();
+                let mut host_port = conn_info.host().split(':');
+                let host = host_port.next().unwrap().to_owned();
+                let port = host_port.next();
                 let uri = req.uri().to_owned();
 
-                let url = if port == "80" {
+                let url = if port.is_none() || port == Some("80") {
                     format!("https://{host}{uri}")
                 } else {
                     format!("https://{host}:{HTTPS_PORT}{uri}")
