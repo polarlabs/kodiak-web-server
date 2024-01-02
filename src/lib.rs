@@ -185,8 +185,8 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
     let server_task = tokio::spawn(server);
 
     // Use DirectoryUrl::LetsEncryptStaging for dev/testing.
-    //let url = acme::DirectoryUrl::LetsEncrypt;
-    let url = acme::DirectoryUrl::LetsEncryptStaging;
+    //let url = acme::DirectoryUrl::LetsEncryptStaging;
+    let url = acme::DirectoryUrl::LetsEncrypt;
 
     // Create a directory entrypoint.
     let dir = acme::Directory::fetch(url).await?;
