@@ -11,7 +11,7 @@ license = "AGPL-3.0-only"
 edition = "2021"
 
 # Despite being Open Source and published on GitHub,
-# it is not intented to publish it via a registry like crates.io.
+# it is not intended to publish it via a registry like crates.io.
 publish = false
 
 # Disable autodiscovery for tests, use test target (see below).
@@ -21,38 +21,123 @@ autotests = false
 path = "src/lib.rs"
 
 [[bin]]
-path = "src/main.rs"
+path = "src/bin/kodiak-web-server.rs"
 name = "kodiak-web-server"
 
 [dependencies]
+# todo: replace with acme-_lib
 acme-rfc8555 = "0.1.1"
+
 actix-files = "0.6.2"
 actix-web = { version = "4.4.1", features = ["rustls-0_21"] }
 eyre = "0.6.11"
+chrono = { version = "0.4.38", features = ["serde"] }
 color-eyre = "0.6.2"
+
+data-encoding = "2.5.0"
 futures-util = "0.3.30"
-log = "0.4.20"
+
+# todo: replace with own implementation
+json_schema = "1.7.5"
+
 openssl = "0.10.62"
+rand = "0.8.5"
+ring = "0.17.7"
+rust_decimal = "1.33.1"
 rustls = "0.21.10"
 rustls-pemfile = "1.0.4"
+semver = "1.0.21"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.131"
 
-# Use tokio::fs for async file io.
+#
+# Notes on updating sqlx / rusqlite:
+# 1. sqlx and rusqlite require both libsqlite3-sys, which links to libsqlite.
+#    Check compatability before updating one of them.
+#    sqlx/0.7.3 works with rusqlite/0.30.0
+# 2. Make sure to also update sqlx-cli by running cargo install sqlx-cli.
+#
+rusqlite = { version = "0.32.1", features = ["backup", "bundled", "hooks", "limits", "uuid"] }
+sqlx = { version = "0.8.2", features = ["chrono", "macros", "runtime-tokio", "tls-rustls", "postgres", "sqlite", "uuid"] }
+
+# Use tokio::fs for async fs io.
 tokio = { version = "1.35.1", features = ["fs", "macros", "rt-multi-thread"] }
 
-[dev-dependencies]
-reqwest = "0.11.23"
+uuid = { version = "1.11.0", features = ["v4", "serde"] }
+validator = { version = "0.18.1", features = ["derive"] }
 
-# Dedicated target for tests to avoid having one crate per test file,
+# Clap provides the command line interface.
+[dependencies.clap]
+version = "4.5.21"
+default-features = false
+
+# cargo: use information from Cargo.toml in help.
+# color: improve readability by font style and color.
+# derive: CLI arguments derived from struct.
+# error-context: provide distinct error messages on incorrect CLI usage.
+# env: support environment variables.
+# help: provide help (-h | --help) automatically.
+# std: required to build clap.
+# usage: provide usage in help.
+# wrap_help: wrop long lines in help with proper indentation.
+features = [ "cargo", "color", "derive", "error-context", "env", "help", "std", "usage", "wrap_help" ]
+
+# Config organizes hierarchical or layered configurations.
+[dependencies.config]
+version = "0.14.1"
+default-features = false
+
+# toml: config file uses toml format.
+features = [ "toml" ]
+
+# Load environment variables from a .env file in development or testing environments in which setting environment variables is not practical.
+# Only used within development and testing (optional = true).
+[dependencies.dotenv]
+version = "0.15.0"
+default-features = false
+features = []
+optional = true
+
+# Implements a logger configured via environment variables.
+[dependencies.env_logger]
+version = "0.11.8"
+default-features = false
+
+# auto-color: colored output
+features = [ "auto-color" ]
+
+# Log provides an easy-to-use logging facade but w/o a logger implementation it is a noop.
+[dependencies.log]
+version = "0.4.22"
+default-features = false
+
+# max_level_trace: all log levels are enabled.
+# release_max_level_info: release builds have debug and trace level logs disabled.
+features = [ "max_level_trace", "release_max_level_info" ]
+
+[dev-dependencies]
+reqwest = "0.12.8"
+
+[features]
+# Workaround the missing capability to use cfg(not(profile = release)) for conditional compilation.
+default = [ "dev-profile" ]
+dev-profile = [ "dep:dotenv" ]
+
+# Dedicated target for tests to avoid having one crate per test fs,
 # allows code sharing across multiple test files.
 # How to run tests:
 # - all tests: `cargo test`
-# - unit tests (lib) only: `cargo test --lib`
+# - unit tests (_lib) only: `cargo test --_lib`
 # - unit tests (bins) only: `cargo test --bin '*'`
 # - integration tests only: `cargo test --test integration`
 # - doc tests only: `cargo test --doc`
 [[test]]
 name = "integration"
 path = "tests/lib.rs"
+
+# Speed up compile-time verified queries, see https://crates.io/crates/sqlx.
+[profile.dev.package.sqlx-macros]
+opt-level = 3
 
 # See: https://github.com/johnthagen/min-sized-rust
 #[profile.release]

@@ -28,7 +28,7 @@ jobs:
     uses: polarlabs/factory/.github/workflows/cargo-dep-cache.yml@v/4.0.0
 
   wf_full:
-    uses: polarlabs/kodiak-web-server/.github/workflows/wf_full.yml@dev
+    uses: polarlabs/kodiak-webapi-server/.github/workflows/wf_full.yml@dev
     needs: [ cargo-fetch ]
     strategy:
       matrix:

@@ -39,7 +39,7 @@ jobs:
       - name: Set output (stage 1)
         id: set-output-1
         run: |
-          echo "TRIGGER_REPO_NAME=${{ github.event.client_payload.repository || 'kodiak-web-client' }}" >> "$GITHUB_OUTPUT"
+          echo "TRIGGER_REPO_NAME=${{ github.event.client_payload.repository || 'kodiak-webapi-client' }}" >> "$GITHUB_OUTPUT"
           echo "TRIGGER_REPO_OWNER=${{ github.event.client_payload.owner || 'polarlabs' }}" >> "$GITHUB_OUTPUT"
           echo "TRIGGER_REF_NAME=${{ github.event.client_payload.ref_name || 'dev' }}" >> "$GITHUB_OUTPUT"
           echo "TRIGGER_ARTIFACT_NAME=${{ github.event.client_payload.artifact_name || 'dist.tar.gz' }}" >> "$GITHUB_OUTPUT"
@@ -57,7 +57,7 @@ jobs:
     uses: polarlabs/factory/.github/workflows/cargo-dep-cache.yml@v/4.0.0
 
   wf_full:
-    uses: polarlabs/kodiak-web-server/.github/workflows/wf_full.yml@main
+    uses: polarlabs/kodiak-webapi-server/.github/workflows/wf_full.yml@main
     needs: [ payload, cargo-fetch ]
     strategy:
       matrix:

@@ -1,0 +1,8 @@
+# Undefined keys are silently ignored.
+
+[database]
+#
+# Kodiak only supports sqlite. Using sqlite you must define a directory.
+# Example: sqlite://db refers to the directory db located in Kodiak's
+#          working directory.
+url = "sqlite://db"

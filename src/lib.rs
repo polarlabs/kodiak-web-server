@@ -1,13 +1,35 @@
-mod tls;
+// Modules
+pub mod webapi;
 
-use std::fs::File;
+pub mod cli;
+
+mod config;
+pub use config::Config;
+
+pub mod constants;
+
+pub mod db;
+
+mod fs;
+mod model;
+
+pub mod net;
+
+pub mod tls;
+
+pub mod util;
+
 use actix_files::Files;
-use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
-use actix_web::{http, web, Responder};
 use actix_web::dev::{Server, Service};
-use actix_web::middleware::{Logger};
+use actix_web::middleware::Logger;
+use actix_web::{http, Responder};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 use futures_util::{future, FutureExt};
+use semver::Version as SemVer;
+use std::fs::File;
 
+use crate::db::Pool;
+use actix_web::web::Data;
 use std::net::TcpListener;
 use std::time::Duration;
 
@@ -24,18 +46,28 @@ const CERTIFICATE_DIR: &str = "./certs";
 const DOMAIN_NAME: &str = "kodiak.polarlabs.io";
 const CONTACT_EMAIL: &str = "contact@polarlabs.io";
 
+const DATABASE_URL: &str = "sqlite://db/_kodiak.sqlite3";
+
 async fn status(_req: HttpRequest) -> impl Responder {
+    log::info!("Request to status.");
+
     HttpResponse::Ok()
+        .append_header(("X-Robots-Tag", "noindex"))
+        .finish()
 }
 
 async fn version(_req: HttpRequest) -> impl Responder {
     let version: String = if option_env!("GITHUB_ACTIONS").is_some() {
-        format!("{}-{}",
+        format!(
+            "{}-{}",
             option_env!("CARGO_PKG_VERSION").unwrap_or(DEFAULT_VERSION_STRING),
-            option_env!("BUILD_NUMBER").unwrap_or(DEFAULT_BUILD_NUMBER))
+            option_env!("BUILD_NUMBER").unwrap_or(DEFAULT_BUILD_NUMBER)
+        )
     } else {
-        format!("{}-0+local",
-            option_env!("CARGO_PKG_VERSION").unwrap_or(DEFAULT_VERSION_STRING))
+        format!(
+            "{}-0+local",
+            option_env!("CARGO_PKG_VERSION").unwrap_or(DEFAULT_VERSION_STRING)
+        )
     };
 
     println!("{}", version);
@@ -51,51 +83,65 @@ async fn redirect_to_https(_req: HttpRequest) -> impl Responder {
 
 // https://github.com/actix/examples/tree/master/middleware/http-to-https
 pub fn run_http(listener: TcpListener) -> Result<Server, std::io::Error> {
-    let server = HttpServer::new(|| App::new()
-        .wrap_fn(|req, srv| {
-            if req.connection_info().scheme() == "https" {
-                future::Either::Left(srv.call(req).map(|res| res))
-            } else {
-                let conn_info = req.connection_info().clone();
-                let mut host_port = conn_info.host().split(':');
-                let host = host_port.next().unwrap().to_owned();
-                let port = host_port.next();
-                let uri = req.uri().to_owned();
-
-                let url = if port.is_none() || port == Some("80") {
-                    format!("https://{host}{uri}")
+    let server = HttpServer::new(|| {
+        App::new()
+            .wrap_fn(|req, srv| {
+                if req.connection_info().scheme() == "https" {
+                    future::Either::Left(srv.call(req).map(|res| res))
                 } else {
-                    format!("https://{host}:{HTTPS_PORT}{uri}")
-                };
+                    let conn_info = req.connection_info().clone();
+                    let mut host_port = conn_info.host().split(':');
+                    let host = host_port.next().unwrap().to_owned();
+                    let port = host_port.next();
+                    let uri = req.uri().to_owned();
 
-                future::Either::Right(future::ready(Ok(req.into_response(
-                    HttpResponse::MovedPermanently()
-                        .append_header((http::header::LOCATION, url))
-                        .finish(),
-                ))))
-            }
-        })
-        .route("/", web::get().to(redirect_to_https)))
-        .listen(listener)?
-        .run();
+                    let url = if port.is_none() || port == Some("80") {
+                        format!("https://{host}{uri}")
+                    } else {
+                        format!("https://{host}:{HTTPS_PORT}{uri}")
+                    };
+
+                    future::Either::Right(future::ready(Ok(req.into_response(
+                        HttpResponse::MovedPermanently()
+                            .append_header((http::header::LOCATION, url))
+                            .finish(),
+                    ))))
+                }
+            })
+            .route("/", actix_web::web::get().to(redirect_to_https))
+    })
+    .listen(listener)?
+    .run();
 
     Ok(server)
 }
 
-pub fn run_https(listener: TcpListener) -> Result<Server, std::io::Error> {
+pub fn run_https(
+    listener: TcpListener,
+    pool: Pool,
+) -> Result<Server, std::io::Error> {
     let tls_config = load_rustls_config();
 
-    let server = HttpServer::new(|| App::new()
-        .route("/status", web::get().to(status))
-        .route("/version", web::get().to(version))
-        .service(Files::new(CLIENT_PATH, CLIENT_DIR).index_file(INDEX_FILE)))
-        .listen_rustls_0_21(listener, tls_config)?
-        .run();
+    let server = HttpServer::new(
+        move || {
+            App::new()
+                .configure(webapi::schema::config)
+                .route("/status", actix_web::web::get().to(status))
+                .route("/version", actix_web::web::get().to(version))
+                .service(Files::new(CLIENT_PATH, CLIENT_DIR).index_file(INDEX_FILE))
+                .app_data(Data::new(pool.clone()))
+        }, //.service(webapi::schema::create)
+    )
+    //.service(webapi::schema::update)
+    //.service(webapi::schema::delete))
+    .listen_rustls_0_21(listener, tls_config)?
+    .run();
 
     Ok(server)
 }
 
-pub async fn init(listener: TcpListener) {
+pub async fn init(listener: TcpListener, config: Config) {
+    
     if File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).is_err() {
         match gen_tls_cert(listener, DOMAIN_NAME, CONTACT_EMAIL).await {
             Ok(cert) => {
@@ -123,24 +169,32 @@ pub async fn init(listener: TcpListener) {
             // Just use certificate / key
         }
     }
+
+    // todo:
+    // try to connect to database
+    // run migrations to catch up with app_version
+    //let _pool = pool().await;
 }
 
 fn load_rustls_config() -> rustls::ServerConfig {
     // Load TLS key / certificates
-    let (cert_chain, key ) = if File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).is_ok() &&
-        File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key")).is_ok() {
-        (tls::load_certs(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")),
-         tls::load_key(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key"))
+    let (cert_chain, key) = if File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")).is_ok()
+        && File::open(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key")).is_ok()
+    {
+        (
+            tls::load_certs(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.pem")),
+            tls::load_key(format!("{CERTIFICATE_DIR}/{DOMAIN_NAME}.key")),
         )
     } else {
-        (tls::load_certs(format!("{CERTIFICATE_DIR}/localhost.pem")),
-         tls::load_key(format!("{CERTIFICATE_DIR}/localhost.key"))
+        (
+            tls::load_certs(format!("{CERTIFICATE_DIR}/localhost.pem")),
+            tls::load_key(format!("{CERTIFICATE_DIR}/localhost.key")),
         )
     };
 
     match (cert_chain, key) {
         (Ok(cert_chain), Ok(Some(key))) => {
-            // init server config builder with safe defaults
+            // 0.1.0 server config builder with safe defaults
             let config = rustls::ServerConfig::builder()
                 .with_safe_defaults()
                 .with_no_client_auth()
@@ -167,7 +221,11 @@ fn load_rustls_config() -> rustls::ServerConfig {
     //let mut keys: Vec<PrivatePkcs8KeyDer> = pkcs8_private_keys(key_file).map(|x| x.unwrap()).collect();
 }
 
-pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_email: &str) -> eyre::Result<acme::Certificate> {
+pub async fn gen_tls_cert(
+    listener: TcpListener,
+    user_domain: &str,
+    contact_email: &str,
+) -> eyre::Result<acme::Certificate> {
     // Create directory for ACME challenge.
     log::info!("Ensure directory for ACME challenge exists.");
     tokio::fs::create_dir_all(CHALLENGE_DIR).await?;
@@ -181,15 +239,13 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
     let server = HttpServer::new(|| {
         App::new()
             .wrap(Logger::default().log_target("acme"))
-            .service(
-                Files::new("/.well-known/acme-challenge", CHALLENGE_DIR).show_files_listing(),
-        )
+            .service(Files::new("/.well-known/acme-challenge", CHALLENGE_DIR).show_files_listing())
     })
-        .listen(listener)?
-        .workers(1)
-        .shutdown_timeout(0)
-        .disable_signals()
-        .run();
+    .listen(listener)?
+    .workers(1)
+    .shutdown_timeout(0)
+    .disable_signals()
+    .run();
 
     let server_handle = server.handle();
     let server_task = tokio::spawn(server);
@@ -230,13 +286,13 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
         // this will only be one element).
         let auths = new_order.authorizations().await?;
 
-        // For HTTP, the challenge is a text file that needs to be placed so it
-        // is accessible to our web server:
+        // For HTTP, the challenge is a text fs that needs to be placed so it
+        // is accessible to our webapi server:
         //
         // ./acme-challenge/<token>
         //
         // The important thing is that it's accessible over the
-        // web for the domain we are trying to get a
+        // webapi for the domain we are trying to get a
         // certificate for:
         //
         // http://example.org/.well-known/acme-challenge/<token>
@@ -247,14 +303,14 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
         // The token is the filename.
         let token = challenge.http_token();
 
-        // The proof is the contents of the file
+        // The proof is the contents of the fs
         let proof = challenge.http_proof()?;
 
-        // Place the file/contents in the correct place.
+        // Place the fs/contents in the correct place.
         let path = format!("{CHALLENGE_DIR}/{token}");
         tokio::fs::write(&path, &proof).await?;
 
-        // After the file is accessible from the web
+        // After the fs is accessible from the webapi
         // tell the ACME API to start checking the
         // existence of the proof.
         //
@@ -279,7 +335,8 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
     // for the status change.
     let cert_order = csr_order
         .finalize(signing_key, Duration::from_millis(5000))
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // Download the certificate.
     let cert = cert_order.download_cert().await.unwrap();
@@ -296,11 +353,18 @@ pub async fn gen_tls_cert(listener: TcpListener, user_domain: &str, contact_emai
     tokio::fs::write(&cert_path, cert.certificate()).await?;
     log::info!("Certificate persisted to {cert_path}.");
 
-    // todo: ensure strict access rights on file
+    // todo: ensure strict access rights on fs
     log::info!("Persist key.");
     let key_path = format!("{CERTIFICATE_DIR}/{user_domain}.key");
     tokio::fs::write(&key_path, cert.private_key()).await?;
     log::info!("Private key persisted to {key_path}.");
 
     Ok(cert)
+}
+
+pub async fn pool() -> Pool {
+    // todo: set app_version properly.
+    db::pool(DATABASE_URL, SemVer::parse("0.1.0").unwrap())
+        .await
+        .unwrap_or_else(|| panic!("Failed to connect to {}.", DATABASE_URL))
 }

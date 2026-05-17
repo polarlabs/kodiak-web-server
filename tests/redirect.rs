@@ -7,7 +7,10 @@ use reqwest::StatusCode;
 async fn redirect() {
     let address = spawn_app_http();
 
-    let client = reqwest::Client::builder().redirect(Policy::none()).build().unwrap();
+    let client = reqwest::Client::builder()
+        .redirect(Policy::none())
+        .build()
+        .unwrap();
 
     let response = client
         .get(format!("{address}/"))

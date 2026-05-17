@@ -23,7 +23,9 @@ as a Docker image including the [Kodiak web client](https://github.com/polarlabs
 
 :pencil: Deploy to kodiak.polarlabs.dev.
 
-:pencil: Provide CRUD operations for `Namespaces` via REST API.
+:pencil: Provide CRUD operations for `Schemas` via REST API.
+
+:pencil: Allow to create `Concepts` via REST API.
 
 :pencil: Update connected clients via WebSocket.
  
@@ -36,3 +38,43 @@ as a Docker image including the [Kodiak web client](https://github.com/polarlabs
 ## Version 0.1.0 (delivered)
 
 :heavy_check_mark: Initial release.
+
+# Supported database engines
+
+Kodiak is going to support SQLite first. However, the SQL library Kodiak is based on, also supports 
+PostgreSQL and MySQL. So, extending support to other database engines will be on the roadmap at some 
+time in the future.
+
+# Coding principles
+
+12-factor app
+https://12factor.net/
+
+Clean code principles: see book.
+
+## Error handling
+
+Kodiak's Error system should cover the whole server
+i.e. all third party errors have to be translated into Kodiak own errors.
+[Custom error types](https://www.gyata.ai/rust/custom-error-types-and-traits)
+
+## Build release
+
+Use 
+
+    cargo run --no-default-features
+
+to disable development specific settings, dependencies and code.
+
+# Configuration
+
+Hierarchie, i.e. config parameters provided as command line options overwrite env variables, 
+overwrite settings from configuration files.
+
+1. Command Line Options
+2. Environment Variables
+3. Configuration Files
+
+# Links
+
+[SQLite as an Application File Format](https://www.sqlite.org/appfileformat.html)

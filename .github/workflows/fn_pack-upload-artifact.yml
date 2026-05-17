@@ -25,8 +25,8 @@ on:
         value: ${{ jobs.package.outputs.ARTIFACT_NAME }}
 
 env:
-  BINARY: 'kodiak-web-server'
-  CLIENT_REPO: 'polarlabs/kodiak-web-client'
+  BINARY: 'kodiak-webapi-server'
+  CLIENT_REPO: 'polarlabs/kodiak-webapi-client'
 
 # Restrict permissions of GITHUB_TOKEN
 # Access to scopes not specified is set to "none"

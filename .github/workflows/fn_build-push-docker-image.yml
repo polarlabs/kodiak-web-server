@@ -16,7 +16,7 @@ on:
 env:
   DOCKER_FILE: "./Dockerfile"
   DOCKER_BUILD_DIR: "docker"
-  DOCKER_IMAGE: "kodiak-web-server"
+  DOCKER_IMAGE: "kodiak-webapi-server"
   REGISTRY: "ghcr.io"
   ARTIFACT_RETENTION: 90
 

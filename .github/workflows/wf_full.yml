@@ -96,7 +96,7 @@ jobs:
           echo "CACHE_KEY=${{ env.CACHE_KEY }}" >> $GITHUB_OUTPUT
 
   upload-artifact:
-    uses: polarlabs/kodiak-web-server/.github/workflows/fn_pack-upload-artifact.yml@main
+    uses: polarlabs/kodiak-webapi-server/.github/workflows/fn_pack-upload-artifact.yml@main
     needs: [ cargo-build-2, cargo-test ]
     with:
       BUILD_CACHE_KEY: ${{ needs.cargo-build-2.outputs.CACHE_KEY }}
@@ -104,7 +104,7 @@ jobs:
     secrets: inherit
 
   publish-image:
-    uses: polarlabs/kodiak-web-server/.github/workflows/fn_build-push-docker-image.yml@main
+    uses: polarlabs/kodiak-webapi-server/.github/workflows/fn_build-push-docker-image.yml@main
     needs: [ upload-artifact ]
     with:
       ARTIFACT_NAME: ${{ needs.upload-artifact.outputs.ARTIFACT_NAME }}
